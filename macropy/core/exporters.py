@@ -2,7 +2,7 @@
 """Ways of dealing with macro-expanded code, e.g. caching or
 re-serializing it."""
 
-import imp
+import importlib
 import logging
 import marshal
 import os
@@ -61,6 +61,21 @@ class SaveExporter(object):
 suffix = __debug__ and 'c' or 'o'
 
 
+import importlib.util
+
+def load_compiled_module(name, pathname, file=None):
+    spec = importlib.util.spec_from_file_location(name, pathname, loader=None, submodule_search_locations=None)
+    module = importlib.util.module_from_spec(spec)
+
+    if file:
+        # If the file is provided, set __file__ attribute in the module
+        setattr(module, "__file__", file.name)
+
+    spec.loader.exec_module(module)
+
+    return module
+
+
 class PycExporter(object):
     def __init__(self, root=os.getcwd()):
         self.root = root
@@ -75,7 +90,7 @@ class PycExporter(object):
         marshal.dump(code, f)
         f.flush()
         f.seek(0, 0)
-        f.write(imp.get_magic())
+        f.write(importlib.util.MAGIC_NUMBER))
 
     def find(self, file_path, pathname, description, module_name, package_path):
         try:
@@ -86,7 +101,7 @@ class PycExporter(object):
 
             if py_time > pyc_time:
                 return None
-            x = imp.load_compiled(module_name, pathname + suffix, f)
+            x = load_compiled_module(module_name, pathname + suffix, f)
             return x
         except Exception as e:
             # print(e)
